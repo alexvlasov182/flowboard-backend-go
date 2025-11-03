@@ -5,6 +5,7 @@ import (
 	"flowboard-backend-go/internal/middleware"
 	"flowboard-backend-go/internal/pages"
 	_users "flowboard-backend-go/internal/users"
+	"flowboard-backend-go/pkg/logger"
 	"fmt"
 	"log"
 	"os"
@@ -17,21 +18,29 @@ func main() {
 	// Load ENV
 	err := godotenv.Load()
 	if err != nil {
+		log.Println("No .env file found, using system environment variables")
+	}
 
-		log.Printf("No .env file found or error loading it: %v", err)
+	logger.Init()
+	logger.Log.Infow("Starting FlowBoard API")
+
+	// Check required environment variables
+	requiredEnv := []string{"DB_HOST", "DB_PORT", "DB_USER", "DB_PASS", "DB_NAME", "PORT"}
+	for _, e := range requiredEnv {
+		if os.Getenv(e) == "" {
+			logger.Log.Fatalw("Database environment variable not set", "env", e)
+		}
 	}
 
 	// Connect to database
 	db := database.Connect()
 
 	// Auto-migrate database schemas
-	err = db.AutoMigrate(&_users.User{}, &pages.Page{})
-	if err != nil {
-		log.Fatal("Failed to auto-migrate database schemas:", err)
+	if err := db.AutoMigrate(&_users.User{}, &pages.Page{}); err != nil {
+		logger.Log.Fatalw("Failed to auto-migrate database schemas", "error", err)
 	}
 
-	log.Println("Database migrated successfully")
-	log.Println("FlowBoard Go API ready!")
+	logger.Log.Infow("Database migrated successfully")
 
 	// create layers
 	repo := _users.NewRepository(db)
@@ -39,7 +48,10 @@ func main() {
 	jwtMgr := middleware.NewJWTManager()
 	handler := _users.NewHandler(service, jwtMgr)
 
+	// Set Gin mode
+	gin.SetMode(gin.ReleaseMode)
 	r := gin.Default()
+
 	api := r.Group("/api")
 	{
 		auth := api.Group("/auth")
@@ -58,12 +70,10 @@ func main() {
 	}
 
 	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8080"
-	}
 	addr := fmt.Sprintf(":%s", port)
-	log.Println("listening on", addr)
+	logger.Log.Infow("Listening", "port", port)
+
 	if err := r.Run(addr); err != nil {
-		log.Fatal(err)
+		logger.Log.Fatalw("Server crashed", "error", err)
 	}
 }
