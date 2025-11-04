@@ -42,11 +42,16 @@ func main() {
 
 	logger.Log.Infow("Database migrated successfully")
 
-	// create layers
+	// create layers users
 	repo := _users.NewRepository(db)
 	service := _users.NewService(repo)
 	jwtMgr := middleware.NewJWTManager()
 	handler := _users.NewHandler(service, jwtMgr)
+
+	// pages layers
+	pagesRepo := pages.NewRepository(db)
+	pagesService := pages.NewService(pagesRepo)
+	pageHandler := pages.NewHandler(pagesService)
 
 	// Set Gin mode
 	gin.SetMode(gin.ReleaseMode)
@@ -67,6 +72,17 @@ func main() {
 			users.GET("/me", handler.Profile)
 			// add more protected user endpoints here
 		}
+	}
+
+	pagesGroup := api.Group("/pages")
+	pagesGroup.Use(middleware.AuthMiddleware(jwtMgr))
+	{
+		pagesGroup.GET("/", pageHandler.GetAllPages)
+		pagesGroup.POST("/", pageHandler.CreatePage)
+		pagesGroup.GET("/:id", pageHandler.GetPageByID)
+		pagesGroup.GET("/user/:userID", pageHandler.GetPageByID)
+		pagesGroup.PUT("/:id", pageHandler.UpdatePage)
+		pagesGroup.DELETE("/:id", pageHandler.DeletePage)
 	}
 
 	port := os.Getenv("PORT")
