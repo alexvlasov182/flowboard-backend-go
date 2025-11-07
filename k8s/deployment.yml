@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: flowboard-backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: flowboard-backend
+  template:
+    metadata:
+      labels:
+        app: flowboard-backend
+    spec:
+      containers:
+        - name: backend
+          image: <AWS_ECR_URI>/flowboard-backend:latest
+          ports:
+            - containerPort: 8080
+          envFrom:
+            - secretRef:
+                name: flowboard-secrets
+          resources:
+            limits:
+              cpu: "1"
+              memory: "512Mi"
+            requests:
+              cpu: "0.5"
+              memory: "256Mi"

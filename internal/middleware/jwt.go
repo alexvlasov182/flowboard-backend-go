@@ -2,9 +2,7 @@ package middleware
 
 import (
 	"errors"
-	"fmt"
 	"net/http"
-	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -18,24 +16,16 @@ type JWTManager struct {
 	ttl    time.Duration
 }
 
-func NewJWTManager() *JWTManager {
-	secret := os.Getenv("JWT_SECRET")
-	if secret == "" {
-		secret = "dev-secret"
-	}
-	return &JWTManager{
-		secret: secret,
-		ttl:    24 * time.Hour,
-	}
+func NewJWTManager(secret string) *JWTManager {
+	return &JWTManager{secret: secret, ttl: 24 * time.Hour}
 }
 
 func (j *JWTManager) Generate(userID uint) (string, error) {
 	claims := jwt.RegisteredClaims{
-		Subject:   fmt.Sprint(userID),
+		Subject:   strconv.Itoa(int(userID)),
 		ExpiresAt: jwt.NewNumericDate(time.Now().Add(j.ttl)),
 		IssuedAt:  jwt.NewNumericDate(time.Now()),
 	}
-
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	return token.SignedString([]byte(j.secret))
 }
@@ -48,10 +38,7 @@ func (j *JWTManager) Verify(tokenStr string) (*jwt.RegisteredClaims, error) {
 		}
 		return []byte(j.secret), nil
 	})
-	if err != nil {
-		return nil, err
-	}
-	if !token.Valid {
+	if err != nil || !token.Valid {
 		return nil, errors.New("invalid token")
 	}
 	return claims, nil
@@ -59,7 +46,6 @@ func (j *JWTManager) Verify(tokenStr string) (*jwt.RegisteredClaims, error) {
 
 const ContextUserIDKey = "userID"
 
-// Gin middleware to require auth
 func AuthMiddleware(j *JWTManager) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		auth := c.GetHeader("Authorization")
@@ -72,28 +58,13 @@ func AuthMiddleware(j *JWTManager) gin.HandlerFunc {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid auth header"})
 			return
 		}
-		tokenStr := parts[1]
-		claims, err := j.Verify(tokenStr)
+		claims, err := j.Verify(parts[1])
 		if err != nil {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid token: " + err.Error()})
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid token"})
 			return
 		}
-		// parse subject as uint
-		var uid uint
-		if claims.Subject == "" {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid token subject"})
-			return
-		}
-		// convert
-		var parsed uint64
-		parsed, err = strconv.ParseUint(claims.Subject, 10, 32)
-		if err != nil {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid token subject"})
-			return
-		}
-		uid = uint(parsed)
-
-		c.Set(ContextUserIDKey, uid)
+		uid, _ := strconv.ParseUint(claims.Subject, 10, 32)
+		c.Set(ContextUserIDKey, uint(uid))
 		c.Next()
 	}
 }

@@ -12,6 +12,7 @@ type Config struct {
 	DBPass    string
 	DBName    string
 	JWTSecret string
+	Mode      string
 }
 
 func LoadConfig() (*Config, error) {
@@ -27,6 +28,7 @@ func LoadConfig() (*Config, error) {
 		DBPass:    viper.GetString("DB_PASS"),
 		DBName:    viper.GetString("DB_NAME"),
 		JWTSecret: viper.GetString("JWT_SECRET"),
+		Mode:      viper.GetString("GIN_MODE"),
 	}
 	return cfg, nil
 }
