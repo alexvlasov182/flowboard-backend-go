@@ -1,10 +1,11 @@
 package pages
 
 import (
-	"flowboard-backend-go/internal/middleware"
-	"flowboard-backend-go/pkg/logger"
 	"fmt"
 	"net/http"
+	"strconv"
+
+	"flowboard-backend-go/internal/middleware"
 
 	"github.com/gin-gonic/gin"
 )
@@ -19,6 +20,21 @@ func NewHandler(service Service) *Handler {
 	}
 }
 
+// getUserID safely retrieves user ID from context
+func getUserID(c *gin.Context) (uint, error) {
+	uidVal, exists := c.Get(middleware.ContextUserIDKey)
+	if !exists {
+		return 0, fmt.Errorf("unauthorized")
+	}
+
+	uid, ok := uidVal.(uint)
+	if !ok {
+		return 0, fmt.Errorf("invalid user ID type")
+	}
+
+	return uid, nil
+}
+
 func (h *Handler) CreatePage(c *gin.Context) {
 	var input PageInput
 	if err := c.ShouldBindJSON(&input); err != nil {
@@ -26,54 +42,51 @@ func (h *Handler) CreatePage(c *gin.Context) {
 		return
 	}
 
-	uid, exists := c.Get(middleware.ContextUserIDKey)
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+	userID, err := getUserID(c)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 		return
 	}
-	userID := uid.(uint)
 
 	page, err := h.service.CreatePage(input, userID)
 	if err != nil {
-		logger.Log.Errorw("failed to create page", "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusCreated, page)
+	c.JSON(http.StatusCreated, gin.H{"success": true, "data": page})
 }
 
 func (h *Handler) GetAllPages(c *gin.Context) {
-	uid, exists := c.Get(middleware.ContextUserIDKey)
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+	userID, err := getUserID(c)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 		return
 	}
-	userID := uid.(uint)
 
-	pages, err := h.service.GetAllPages(userID)
+	pages, err := h.service.GetAllPagesByUser(userID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, pages)
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": pages})
 }
 
 func (h *Handler) GetPageByID(c *gin.Context) {
-	uid, exists := c.Get(middleware.ContextUserIDKey)
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+	userID, err := getUserID(c)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 		return
 	}
-	userID := uid.(uint)
 
 	idParam := c.Param("id")
-	var id uint
-	if _, err := fmt.Sscan(idParam, &id); err != nil {
+	id64, err := strconv.ParseUint(idParam, 10, 32)
+	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid page ID"})
 		return
 	}
+	id := uint(id64)
 
 	page, err := h.service.GetPageByID(id, userID)
 	if err != nil {
@@ -85,23 +98,23 @@ func (h *Handler) GetPageByID(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, page)
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": page})
 }
 
 func (h *Handler) UpdatePage(c *gin.Context) {
-	uid, exists := c.Get(middleware.ContextUserIDKey)
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+	userID, err := getUserID(c)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 		return
 	}
-	userID := uid.(uint)
 
 	idParam := c.Param("id")
-	var id uint
-	if _, err := fmt.Sscan(idParam, &id); err != nil {
+	id64, err := strconv.ParseUint(idParam, 10, 32)
+	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid page ID"})
 		return
 	}
+	id := uint(id64)
 
 	var input PageInput
 	if err := c.ShouldBindJSON(&input); err != nil {
@@ -119,23 +132,23 @@ func (h *Handler) UpdatePage(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, page)
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": page})
 }
 
 func (h *Handler) DeletePage(c *gin.Context) {
-	uid, exists := c.Get(middleware.ContextUserIDKey)
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+	userID, err := getUserID(c)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 		return
 	}
-	userID := uid.(uint)
 
 	idParam := c.Param("id")
-	var id uint
-	if _, err := fmt.Sscan(idParam, &id); err != nil {
+	id64, err := strconv.ParseUint(idParam, 10, 32)
+	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid page ID"})
 		return
 	}
+	id := uint(id64)
 
 	if err := h.service.DeletePage(id, userID); err != nil {
 		if err == ErrPageNotFound {

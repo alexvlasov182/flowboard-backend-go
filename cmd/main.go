@@ -39,6 +39,7 @@ func main() {
 	// Gin
 	gin.SetMode(cfg.Mode)
 	r := gin.Default()
+	r.Use(middleware.CORSMiddleware())
 
 	api := r.Group("/api")
 	{
@@ -53,8 +54,8 @@ func main() {
 
 	pagesGroup := api.Group("/pages")
 	pagesGroup.Use(middleware.AuthMiddleware(jwtMgr))
-	pagesGroup.GET("/", pageHandler.GetAllPages)
-	pagesGroup.POST("/", pageHandler.CreatePage)
+	pagesGroup.GET("", pageHandler.GetAllPages)
+	pagesGroup.POST("", pageHandler.CreatePage)
 	pagesGroup.GET("/:id", pageHandler.GetPageByID)
 	pagesGroup.PUT("/:id", pageHandler.UpdatePage)
 	pagesGroup.DELETE("/:id", pageHandler.DeletePage)

@@ -10,7 +10,7 @@ var (
 
 type Service interface {
 	CreatePage(input PageInput, userID uint) (*Page, error)
-	GetAllPages(userID uint) ([]Page, error)
+	GetAllPagesByUser(userID uint) ([]Page, error)
 	GetPageByID(id, userID uint) (*Page, error)
 	UpdatePage(id uint, input PageInput, userID uint) (*Page, error)
 	DeletePage(id, userID uint) error
@@ -30,11 +30,10 @@ func (s *service) CreatePage(input PageInput, userID uint) (*Page, error) {
 		Content: input.Content,
 		UserID:  userID,
 	}
-
 	return s.repo.CreatePage(page)
 }
 
-func (s *service) GetAllPages(userID uint) ([]Page, error) {
+func (s *service) GetAllPagesByUser(userID uint) ([]Page, error) {
 	return s.repo.GetAllPagesByUser(userID)
 }
 
